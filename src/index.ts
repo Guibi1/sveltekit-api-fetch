@@ -1,3 +1,4 @@
-import { createApiObject } from "./fetch.js";
+import { createApiObject, createRpcObject } from "./fetch.js";
 
 export const api = createApiObject(fetch);
+export const rpc = createRpcObject(fetch);
