@@ -41,7 +41,7 @@ export function createApiObject(fetch: Fetch) {
     };
 }
 
-class RpcFetchError extends Error {
+export class RpcFetchError extends Error {
     response: Response;
     constructor(response: Response) {
         super(`rpcFetch failed: Received status ${response.status}. Data: '${response.text()}'`);
