@@ -41,6 +41,14 @@ export function createApiObject(fetch: Fetch) {
     };
 }
 
+class RpcFetchError extends Error {
+    response: Response;
+    constructor(response: Response) {
+        super(`rpcFetch failed: Received status ${response.status}. Data: '${response.text()}'`);
+        this.response = response;
+    }
+}
+
 const rpcFetch = async function <M extends AllowedMethod, U extends AllowedUrl<M>>(
     method: M,
     url: U,
@@ -68,9 +76,7 @@ const rpcFetch = async function <M extends AllowedMethod, U extends AllowedUrl<M
     });
 
     if (result.status != 200) {
-        throw new Error(
-            `rpcFetch failed: Received status ${result.status}. Data: '${result.text()}'`
-        );
+        throw new RpcFetchError(result);
     }
 
     return await result.json();
