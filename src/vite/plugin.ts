@@ -60,7 +60,8 @@ export function typesafeApi(): Plugin {
     function parseFile(file: ts.SourceFile, typeChecker: ts.TypeChecker) {
         const endpointsFound: Method[] = [];
         const allBodies: EndpointData = {};
-        let allSearchParams: EndpointData = {};
+        const allSearchParams: EndpointData = {};
+        const allReturnTypes: EndpointData = {};
 
         ts.forEachChild(file, (node) => {
             if (
@@ -83,22 +84,23 @@ export function typesafeApi(): Plugin {
                             if (ts.isSatisfiesExpression(node)) {
                                 return ts.forEachChild(node.expression, (node) => {
                                     if (ts.isFunctionLike(node)) {
-                                        return getSchemaFromFunction(node);
+                                        return getSchemaFromFunction(typeChecker, node);
                                     }
                                 });
                             } else if (ts.isFunctionLike(node)) {
-                                return getSchemaFromFunction(node);
+                                return getSchemaFromFunction(typeChecker, node);
                             }
                         });
 
                         if (schema) {
-                            const { body, searchParams } = parseSchema(
+                            const { body, searchParams, returnType } = parseSchema(
                                 typeChecker,
                                 schema,
                                 variableName.toUpperCase() === "GET"
                             );
                             allBodies[variableName as Method] = body;
                             allSearchParams[variableName as Method] = searchParams;
+                            allReturnTypes[variableName as Method] = returnType;
                         }
                     }
                 });
@@ -110,15 +112,16 @@ export function typesafeApi(): Plugin {
                 if (methods.includes(variableName)) {
                     endpointsFound.push(variableName as Method);
 
-                    const schema = getSchemaFromFunction(node);
+                    const schema = getSchemaFromFunction(typeChecker, node);
                     if (schema) {
-                        const { body, searchParams } = parseSchema(
+                        const { body, searchParams, returnType } = parseSchema(
                             typeChecker,
                             schema,
                             variableName.toUpperCase() === "GET"
                         );
                         allBodies[variableName as Method] = body;
                         allSearchParams[variableName as Method] = searchParams;
+                        allReturnTypes[variableName as Method] = returnType;
                     }
                 }
             }
@@ -154,6 +157,7 @@ export function typesafeApi(): Plugin {
                 body: allBodies[method],
                 routeParams: routeParams,
                 searchParams: allSearchParams[method],
+                returns: allReturnTypes[method],
             });
         }
     }
