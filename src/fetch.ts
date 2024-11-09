@@ -26,9 +26,69 @@ const apiFetch = function <M extends AllowedMethod, U extends AllowedUrl<M>>(
 
 export function createApiObject(fetch: Fetch) {
     function createRequest<M extends AllowedMethod>(method: M) {
-        // MM is required to make sure that TypeScript doens't replace the AllowedUrl with never
+        // MM is required to make sure that TypeScript doesn't replace the AllowedUrl with never
         return <MM extends M, U extends AllowedUrl<MM>>(url: U, init: PartialInit<MM, U>) =>
             apiFetch(method, url, init, fetch);
+    }
+
+    return {
+        GET: createRequest("GET"),
+        POST: createRequest("POST"),
+        PATCH: createRequest("PATCH"),
+        PUT: createRequest("PUT"),
+        DELETE: createRequest("DELETE"),
+        OPTIONS: createRequest("OPTIONS"),
+    };
+}
+
+export class RpcFetchError extends Error {
+    response: Response;
+    constructor(response: Response) {
+        super(`rpcFetch failed: Received status ${response.status}. Data: '${response.text()}'`);
+        this.response = response;
+    }
+}
+
+const rpcFetch = async function <M extends AllowedMethod, U extends AllowedUrl<M>>(
+    method: M,
+    url: U,
+    init: Init<M, U>,
+    fetch: Fetch
+): Promise<ApiReturnType<M, U>> {
+    const body = init.body ? JSON.stringify((init as RequestInit).body) : undefined;
+    const routeParams = init.routeParams ? Object.entries<string>(init.routeParams) : [];
+    const searchParams = init.searchParams ? Object.entries<string>(init.searchParams) : [];
+
+    const headers = {
+        Accept: "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(init ? init.headers : {}),
+    };
+
+    delete init.routeParams;
+    delete init.searchParams;
+
+    const result = await fetch(generateUrl(url as string, routeParams, searchParams), {
+        ...init,
+        method,
+        headers,
+        body,
+    });
+
+    if (result.status != 200) {
+        throw new RpcFetchError(result);
+    }
+
+    return await result.json();
+};
+
+export function createRpcObject(fetch: Fetch) {
+    function createRequest<M extends AllowedMethod>(method: M) {
+        // MM is required to make sure that TypeScript doesn't replace the AllowedUrl with never
+        return <MM extends M, U extends AllowedUrl<MM>>(
+            url: U,
+            init: PartialInit<MM, U>
+        ): Promise<ApiReturnType<MM, U>> => rpcFetch<MM, U>(method as MM, url, init, fetch);
     }
 
     return {
@@ -91,6 +151,11 @@ type AllowedData<
     U extends AllowedUrl<M>,
     Field extends string,
 > = Field extends keyof ProjectAPI[M][U] ? ProjectAPI[M][U][Field] : never;
+
+type ApiReturnType<
+    M extends AllowedMethod,
+    U extends AllowedUrl<M>,
+> = "returns" extends keyof ProjectAPI[M][U] ? ProjectAPI[M][U]["returns"] : never;
 
 type Init<M extends AllowedMethod, U extends AllowedUrl<M>> = Omit<
     RequestInit,
