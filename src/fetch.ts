@@ -67,6 +67,12 @@ const rpcFetch = async function <M extends AllowedMethod, U extends AllowedUrl<M
         body,
     });
 
+    if (result.status != 200) {
+        throw new Error(
+            `rpcFetch failed: Received status ${result.status}. Data: '${result.text()}'`
+        );
+    }
+
     return await result.json();
 };
 
